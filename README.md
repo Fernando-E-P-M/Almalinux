@@ -6,7 +6,7 @@
 * **Materia:** Administración de Servidores
 * **Integrantes:**
 1.  Palomares Morales Fernando Eduardo
-2.  Ramos Rojas Ofelia
+2.  Ramos Rojas Ofelia Atziri
 
 * **Profesor:** Gustavo Moises Romero Gonzalez
 * **Fecha:** 25 Mayo 2026
@@ -14,22 +14,25 @@
 ---
 
 ## 1. Objetivo General
-Implementar un entorno de servidor web modular, seguro y de alto rendimiento en el sistema operativo AlmaLinux OS 9 mediante la compilación desde código fuente de NGINX y PHP 8.4, interconectados localmente a través de un Socket UNIX para eliminar la sobrecarga de red y garantizar la persistencia del entorno frente a reinicios del sistema.
+Construir una arquitectura web de alto rendimiento mediante la autogestión de binarios desde el código fuente original en AlmaLinux 9. El propósito es establecer un stack NGINX/PHP 8.4 totalmente optimizado, centralizado en /srv/nginx y comunicado vía Sockets UNIX, asegurando la resiliencia mediante el control absoluto de los servicios del sistema.
 
 ## 2. Objetivos Específicos
-* Compilar NGINX desde su código fuente distribuidor, centralizando la instalación en el Prefix `/srv/nginx` bajo la administración del usuario y grupo del sistema `nginx`.
-* Compilar PHP versión 8.4 desde su código fuente, habilitando el Administrador de Procesos FastCGI (`php-fpm`) de manera integrada en el mismo Prefix `/srv/nginx`.
-* Incorporar soporte nativo para el procesamiento de imágenes (`gd`, `jpeg`, `webp`, `freetype`) e internacionalización y manejo de formatos de fecha (`intl`) en la compilación de PHP.
-* Configurar una comunicación FastCGI basada estrictamente en un Socket UNIX en la ruta `/tmp/php84.sock`, mitigando el uso innecesario de puertos TCP locales.
-* Automatizar el inicio y la gestión de la infraestructura mediante la creación y registro de Slices de Servicio de SystemD (`nginx.service` y `php-fpm8.4.service`) integrados en el `multi-user.target`.
-* Diagnosticar y resolver restricciones de seguridad y permisos de ejecución derivados de SELinux (error de SystemD `status=203/EXEC`) configurando un entorno permisivo persistente.
+Gestión de Origen: Compilar el servidor NGINX y el motor PHP 8.4 desde sus archivos fuente, asegurando una instalación limpia bajo un directorio único de trabajo.
+
+Integración Especializada: Habilitar librerías críticas de procesamiento multimedia y localización (GD, WebP, Intl) durante la etapa de compilación.
+
+Optimización de I/O: Desplazar la comunicación entre el servidor web y el procesador de scripts hacia Sockets UNIX para evitar latencias de red en el stack TCP/IP.
+
+Persistencia de Servicio: Integrar ambos componentes en SystemD, garantizando que el entorno esté disponible automáticamente tras cada arranque del sistema operativo.
+
+Aseguramiento de Operatividad: Gestionar las políticas de seguridad de SELinux para permitir la ejecución de procesos compilados externamente, garantizando la estabilidad del entorno.
 
 ---
 
 ## 3. Desarrollo del Proyecto
 
 ### A. Preparación de Dependencias del Sistema
-Para garantizar que los scripts de configuración (`./configure`) no fallaran por la ausencia de librerías de desarrollo en AlmaLinux, se ejecutó el siguiente comando global de preparación:
+Se preparó el sistema base instalando herramientas de compilación y librerías necesarias::
 ```bash
 sudo dnf update -y
 sudo dnf groupinstall "Development Tools" -y
@@ -37,7 +40,7 @@ sudo dnf install -y epel-release wget pcre-devel pcre2-devel zlib-devel openssl-
     libxml2-devel sqlite-devel libpng-devel libjpeg-turbo-devel freetype-devel \
     libwebp-devel libcurl-devel libffi-devel libicu-devel systemd-devel oniguruma-devel
 ```
-Se crearon las cuentas de servicio del sistema restrictivas y sin acceso a shell (/sbin/nologin):
+Se crearon los usuarios de sistema::
 ```bash
 sudo groupadd nginx
 sudo useradd -g nginx -s /sbin/nologin -r nginx
@@ -59,7 +62,7 @@ sudo ./configure \
     --with-file-aio
 sudo make && sudo make install
 ```
-Se descargó y extrajo la versión 8.4.1 de PHP, activando el soporte para FPM, las credenciales del pool, y las extensiones obligatorias de imágenes (gd) e internacionalización (intl):
+Se compiló NGINX 1.26.0 configurado en /srv/nginx con módulos de SSL y Threading. Posteriormente, se compiló PHP 8.4.1 con las extensiones requeridas:
 ```bash
 cd /usr/src
 sudo wget [https://www.php.net/distributions/php-8.4.1.tar.gz](https://www.php.net/distributions/php-8.4.1.tar.gz)
@@ -86,7 +89,7 @@ sudo ./configure \
     --enable-calendar
 sudo make -j4 && sudo make install
 ```
-Se configuró el archivo del pool principal de PHP-FPM (/srv/nginx/etc/php-fpm.d/www.conf) para inicializar el pool [www] y escuchar peticiones mediante el socket local:
+Se configuró /srv/nginx/etc/php-fpm.d/www.conf para escuchar en el socket:
 ```bash
 [www]
 user = php
@@ -124,10 +127,13 @@ sudo systemctl enable nginx.service php-fpm8.4.service
 sudo systemctl start php-fpm8.4.service nginx.service
 ```
 
-# 4. Conclusiones
-La compilación de infraestructura de servidores a partir de su código fuente original representa una ventaja competitiva crítica en la administración de sistemas, permitiendo omitir módulos innecesarios y optimizar el rendimiento térmico y de procesamiento del hardware real o virtualizado. La implementación del esquema de comunicación mediante FastCGI sobre Sockets UNIX, en sustitución de los puertos TCP loopback tradicionales, reduce drásticamente los tiempos de respuesta y la sobrecarga del stack de red interna del núcleo de Linux. Finalmente, el proceso de resolución de problemas con respecto a los bloqueos de ejecución aplicados por SELinux en AlmaLinux subraya la necesidad de un control preciso sobre los permisos y contextos de seguridad del software en sistemas operativos empresariales derivados de RHEL.
+Aquí tienes una versión más sencilla y clara de tu conclusión, manteniendo los puntos clave pero con un lenguaje más directo:
 
-# 5. Bibliografía (Formato APA 7ma Edición)
+### 4. Conclusiones
+
+Compilar nuestros propios servidores (NGINX y PHP) desde el código fuente nos permitió tener un control total sobre las herramientas instaladas, logrando que funcionen de manera más eficiente al incluir solo lo necesario. Al configurar la comunicación entre ambos mediante Sockets UNIX en lugar de puertos de red, logramos que los datos viajen más rápido dentro del sistema, mejorando el rendimiento general. Finalmente, este proyecto nos ayudó a entender mejor cómo funcionan los permisos de seguridad en sistemas como AlmaLinux (SELinux), aprendiendo que es fundamental configurar correctamente los accesos para que las aplicaciones puedan ejecutarse sin bloqueos.
+
+# 5. Bibliografía 
 AlmaLinux OS Foundation. (2025). AlmaLinux OS 9 Deployment and Configuration Guide. AlmaLinux Docs. https://docs.almalinux.org/
 
 The Nginx Organization. (2026). Nginx Documentation: Core installation from sources. Nginx Enterprise. https://nginx.org/en/docs/install.html
