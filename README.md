@@ -1,6 +1,6 @@
 # Tecnológico de Estudios Superiores del Oriente del Estado de México
 
-## Reporte : Compilación y Configuración de Servidores Web Dedicados
+## Reporte : Proyecto NGINX y PHP
 
 * **Carrera:** Ingeniería en Sistemas Computacionales
 * **Materia:** Administración de Servidores
